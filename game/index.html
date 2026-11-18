@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Costa Bahia — open-world crime</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1420; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #hud { position: fixed; inset: 0; display: none; pointer-events: none; color: #f2f1ec; text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  .panel { background: rgba(8, 10, 18, 0.55); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; padding: 8px 10px; }
+  .hud-tl { position: absolute; top: 14px; left: 14px; }
+  #wanted { font-size: 30px; letter-spacing: 4px; color: #ffd24a; line-height: 1; }
+  #money { font-size: 26px; font-weight: 800; color: #7dff9a; margin-top: 4px; }
+  .bar-row { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 13px; font-weight: 700; }
+  .bar { width: 150px; height: 9px; background: rgba(255,255,255,0.18); border-radius: 5px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 5px; }
+  #health-bar { background: #37d67a; } #armor-bar { background: #4aa8ff; } #rep-bar { background: #ffd24a; }
+  .hud-tr { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #minimap { width: 220px; height: 220px; border: 2px solid rgba(255,255,255,0.35); border-radius: 8px; background: #1c2733; }
+  #clock { font-size: 20px; font-weight: 800; margin-top: 6px; }
+  #location { font-size: 13px; color: #ffd9a0; font-weight: 700; }
+  #radio { font-size: 13px; color: #9be8ff; font-weight: 700; }
+  .hud-mission { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); text-align: center; min-width: 340px; }
+  #mission-title { font-size: 19px; font-weight: 800; letter-spacing: 1px; }
+  #mission-stage-bar { width: 100%; height: 8px; background: rgba(255,255,255,0.18); border-radius: 4px; margin: 6px 0 4px; overflow: hidden; }
+  #mission-stage-bar > div { height: 100%; background: #ffd24a; }
+  #mission-stage, #mission-dist, #mission-timer { font-size: 13px; font-weight: 700; color: #ffe9a0; }
+  .hud-police { position: absolute; left: 14px; top: 240px; width: 250px; }
+  #police-count { font-size: 15px; font-weight: 800; color: #ff8a8a; letter-spacing: 1px; margin-bottom: 4px; }
+  .pr-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .pr-row.air span { color: #ffb35c; }
+  .hud-speed { position: absolute; right: 14px; bottom: 14px; text-align: right; }
+  #speed { font-size: 58px; font-weight: 800; line-height: 0.95; }
+  #speed small { font-size: 18px; color: #ffd9a0; }
+  #carname { font-size: 17px; font-weight: 800; color: #ffe9a0; }
+  #condition { font-size: 13px; font-weight: 700; color: #9be8ff; }
+  #weapons { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
+  .wslot { font-size: 12px; font-weight: 700; background: rgba(8,10,18,0.55); border: 1px solid rgba(255,255,255,0.14); border-radius: 5px; padding: 3px 8px; }
+  .wslot.active { border-color: #ffd24a; color: #ffd24a; }
+  .wslot span { color: #9be8ff; margin-left: 6px; }
+  #dialog { position: absolute; left: 14px; bottom: 14px; display: none; width: 380px; align-items: flex-start; gap: 10px; }
+  #portrait { width: 96px; height: 96px; border-radius: 6px; flex: none; }
+  #dialog-name { font-size: 15px; font-weight: 800; color: #ffd24a; }
+  #dialog-text { font-size: 15px; line-height: 1.35; margin-top: 2px; }
+  #toast { position: absolute; top: 128px; left: 50%; transform: translateX(-50%); display: none; font-size: 20px; font-weight: 800; color: #ffd24a; background: rgba(8,10,18,0.6); padding: 6px 16px; border-radius: 8px; border: 1px solid rgba(255,210,74,0.5); }
+  #objective { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 15px; font-weight: 700; background: rgba(8,10,18,0.55); padding: 6px 14px; border-radius: 8px; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; display: none; }
+  #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; }
+  #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+  #crosshair::after { top: 8px; left: 0; width: 18px; height: 2px; }
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; text-align: center; color: #f2f1ec; background: linear-gradient(180deg, rgba(20,10,30,0.55), rgba(10,10,20,0.75)); text-shadow: 0 2px 8px rgba(0,0,0,0.9); }
+  .screen h1 { font-size: 74px; margin: 0; letter-spacing: 6px; color: #ffd24a; }
+  .screen h2 { font-size: 40px; margin: 0 0 10px; color: #ffd24a; }
+  .screen p { font-size: 18px; line-height: 1.6; margin: 6px 0; max-width: 640px; }
+  .screen .keys { font-size: 15px; color: #ffd9a0; }
+  .screen .go { font-size: 22px; font-weight: 800; color: #7dff9a; margin-top: 14px; }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Costa Bahia: drive, steal cars, dodge the police, run six story missions"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud">
+  <div class="hud-tl panel">
+    <div id="wanted">☆☆☆☆☆</div>
+    <div id="money">$540</div>
+    <div class="bar-row">HP <span id="health-num">100</span><div class="bar"><div id="health-bar" style="width:100%"></div></div></div>
+    <div class="bar-row">ARMOR <span id="armor-num">50</span><div class="bar"><div id="armor-bar" style="width:50%"></div></div></div>
+    <div class="bar-row"><span id="rep-label">REP 4 BAY HUSTLER</span><div class="bar"><div id="rep-bar" style="width:80%"></div></div><span id="rep-num">1960/2400</span></div>
+  </div>
+  <div class="hud-tr">
+    <canvas id="minimap" width="220" height="220"></canvas>
+    <div id="clock">FRI 17:24</div>
+    <div id="location">CORAL SHORE / Paloma Boulevard</div>
+    <div id="radio">WAVE 104 — Sunset Synth</div>
+  </div>
+  <div class="hud-mission panel">
+    <div id="mission-title">MISSION 1/6 — PIER MEETING</div>
+    <div id="mission-stage-bar"><div style="width:33%"></div></div>
+    <div><span id="mission-stage">STAGE 1/3</span> · <span id="mission-dist">—</span> <span id="mission-timer"></span></div>
+  </div>
+  <div class="hud-police panel">
+    <div id="police-count">CBPD RESPONSE</div>
+    <div id="police-list"></div>
+  </div>
+  <div class="hud-speed">
+    <div id="speed">0<small> KM/H</small></div>
+    <div id="carname">ON FOOT</div>
+    <div id="condition">—</div>
+    <div id="weapons"></div>
+  </div>
+  <div id="dialog" class="panel">
+    <canvas id="portrait" width="96" height="96"></canvas>
+    <div><div id="dialog-name">—</div><div id="dialog-text"></div></div>
+  </div>
+  <div id="toast"></div>
+  <div id="objective">▶ Meet Carmen at Pier 9</div>
+  <div id="crosshair"></div>
+</div>
+
+<div id="screen-title" class="screen">
+  <h1>COSTA BAHIA</h1>
+  <p>Sunset. Salt air. Six jobs, one getaway car, and the whole CBPD on your tail.<br>Drive it, steal it, lose the heat — and make it to the Old Harbor by dusk.</p>
+  <p class="keys">WASD drive / walk · E enter &amp; steal car · F punch · G shoot · Q weapon · Shift run/boost · Space handbrake · P pause · R radio · M mute</p>
+  <p id="best-line"></p>
+  <p class="go">Press Enter or click to start</p>
+</div>
+<div id="screen-pause" class="screen">
+  <h2>PAUSED</h2>
+  <p>The city waits for you.</p>
+  <p class="go">Press P to resume</p>
+</div>
+<div id="screen-over" class="screen">
+  <h2 id="over-title">BUSTED</h2>
+  <p id="over-stats"></p>
+  <p class="go">Press Enter to try again</p>
+</div>
+<div id="screen-complete" class="screen">
+  <h2>COSTA BAHIA — COMPLETE</h2>
+  <p>You made it to the harbor. The city is yours.</p>
+  <p id="complete-stats"></p>
+  <p class="go">Press Enter to play again</p>
+</div>
+
+<script src="./vendor/three.min.js"></script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
